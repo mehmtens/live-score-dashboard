@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/*
+  SAHA design tokens
+  ------------------
+  ink        – base background, deep near-black with a cold blue-green cast
+  panel      – card / row surface
+  panel-soft – slightly lifted surface for hero gradients
+  line       – hairline borders / dividers
+  text       – primary text
+  muted      – secondary text, labels, captions
+  gold       – primary accent: live scores, active tab, scoreboard clock
+  teal       – secondary accent: scheduled/neutral states, links
+  away       – live indicator + away-team marker
+  success    – connected / finished-positive states
+*/
+@theme {
+  --color-ink: #0a0e14;
+  --color-panel: #11161f;
+  --color-panel-soft: #161c27;
+  --color-line: #1e2530;
+  --color-text: #f5f7fa;
+  --color-muted: #8b95a5;
+  --color-gold: #f5b942;
+  --color-teal: #2dd4bf;
+  --color-away: #fb5b4b;
+  --color-success: #34d399;
+
+  --font-display: "Oswald", sans-serif;
+  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* Hide scrollbars on horizontally-scrolling tab bars & the match column,
+   while keeping the page's main vertical scrollbar visible and styled. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-ink);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+
+/* Indeterminate sweep used by the header's live indicator when the backend
+   has no real elapsed-minute value to drive a proportional fill. */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+.animate-shimmer {
+  animation: shimmer 1.6s ease-in-out infinite;
+}
