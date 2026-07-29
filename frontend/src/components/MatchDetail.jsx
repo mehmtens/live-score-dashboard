@@ -1,9 +1,9 @@
-import { Shield } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '../lib/cn'
 import { buildStatRows, getStatusHeadline, isFinished, isLive } from '../lib/matchUtils'
 import EmptyState from './EmptyState'
 import StatBar from './StatBar'
+import TeamCrest from './TeamCrest'
 
 const TABS = [
   { key: 'overview', label: 'Genel Bakış' },
@@ -35,9 +35,7 @@ export default function MatchDetail({ match }) {
 
         <div className="my-6 flex items-center justify-center gap-4 md:gap-10">
           <div className="flex-1 text-center">
-            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-ink md:h-16 md:w-16">
-              <Shield className="h-6 w-6 text-gold md:h-7 md:w-7" />
-            </div>
+            <TeamCrest src={match.homeCrest} alt={match.homeTeam} accent="gold" size="lg" className="mx-auto mb-2" />
             <h3 className="font-display text-sm uppercase tracking-wide text-text md:text-base">
               {match.homeTeam}
             </h3>
@@ -61,9 +59,7 @@ export default function MatchDetail({ match }) {
           </div>
 
           <div className="flex-1 text-center">
-            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-ink md:h-16 md:w-16">
-              <Shield className="h-6 w-6 text-away md:h-7 md:w-7" />
-            </div>
+            <TeamCrest src={match.awayCrest} alt={match.awayTeam} accent="away" size="lg" className="mx-auto mb-2" />
             <h3 className="font-display text-sm uppercase tracking-wide text-text md:text-base">
               {match.awayTeam}
             </h3>

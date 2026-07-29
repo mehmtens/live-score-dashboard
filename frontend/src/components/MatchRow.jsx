@@ -1,5 +1,6 @@
 import { cn } from '../lib/cn'
 import { getMinuteLabel, isFinished, isLive } from '../lib/matchUtils'
+import TeamCrest from './TeamCrest'
 
 export default function MatchRow({ match, isSelected, onSelect }) {
   const live = isLive(match)
@@ -26,9 +27,15 @@ export default function MatchRow({ match, isSelected, onSelect }) {
       </span>
 
       <div className="flex items-center gap-3 text-sm">
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-text">{match.homeTeam}</p>
-          <p className="mt-1.5 truncate font-medium text-muted">{match.awayTeam}</p>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <TeamCrest src={match.homeCrest} alt={match.homeTeam} accent="gold" size="sm" />
+            <p className="truncate font-medium text-text">{match.homeTeam}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <TeamCrest src={match.awayCrest} alt={match.awayTeam} accent="away" size="sm" />
+            <p className="truncate font-medium text-muted">{match.awayTeam}</p>
+          </div>
         </div>
         <div className="flex min-w-[2.75rem] flex-col items-center gap-1.5 rounded-lg border border-line bg-ink/60 px-2.5 py-1 font-mono text-base font-bold text-text">
           <span>{match.homeScore}</span>

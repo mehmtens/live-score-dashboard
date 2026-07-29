@@ -46,20 +46,42 @@ if (!API_KEY) {
   console.error('❌ FOOTBALL_API_KEY tanımlı değil. .env dosyana ekle: FOOTBALL_API_KEY=xxxxx');
 }
 
+// Bugünü değil, geçmiş birkaç günü ve önümüzdeki birkaç günü kapsayan bir
+// aralık istiyoruz — API tarih parametresi verilmezse sadece "bugün"ü
+// döndürüyor, bu yüzden geçmiş/bitmiş maçlar hiç görünmüyordu.
+function toDateParam(date) {
+  return date.toISOString().split('T')[0];
+}
+
+function getDateRange() {
+  const today = new Date();
+
+  const dateFrom = new Date(today);
+  dateFrom.setDate(today.getDate() - 3);
+
+  const dateTo = new Date(today);
+  dateTo.setDate(today.getDate() + 2);
+
+  return { dateFrom: toDateParam(dateFrom), dateTo: toDateParam(dateTo) };
+}
+
 // Gerçek Maç Verilerini Çeken Fonksiyon
 async function fetchRealMatches() {
   try {
     const response = await axios.get(FOOTBALL_API_URL, {
-      headers: { 'X-Auth-Token': API_KEY }
+      headers: { 'X-Auth-Token': API_KEY },
+      params: getDateRange()
     });
 
     const rawMatches = response.data.matches || [];
 
     // API'den gelen karmaşık veriyi bizim frontend'in anlayacağı sade formata dönüştürüyoruz (Data Mapping)
-    const formattedMatches = rawMatches.slice(0, 10).map((m) => ({
+    const formattedMatches = rawMatches.slice(0, 30).map((m) => ({
       id: `match-${m.id}`,
       homeTeam: m.homeTeam.shortName || m.homeTeam.name,
       awayTeam: m.awayTeam.shortName || m.awayTeam.name,
+      homeCrest: m.homeTeam.crest || null,
+      awayCrest: m.awayTeam.crest || null,
       homeScore: m.score.fullTime.home ?? 0,
       awayScore: m.score.fullTime.away ?? 0,
       minute: m.status === 'IN_PLAY' ? 'CANLI' : m.status,
