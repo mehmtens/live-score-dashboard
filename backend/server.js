@@ -13,8 +13,7 @@ app.use(express.json());
 
 const server = http.createServer(app);
 
-// Frontend'in adresini .env'den oku (Vercel/Netlify'a deploy ettiğinde
-// buraya gerçek domain'i yazacaksın). Ayarlanmazsa geliştirme için '*' kalır.
+// Frontend'in adresini .env'den oku
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 // Socket.io Ayarları
@@ -26,9 +25,6 @@ const io = new Server(server, {
 });
 
 // Redis Bağlantısı
-// Yerelde çalışırken REDIS_URL tanımlı değilse localhost'a bağlanır.
-// Deploy ederken Upstash/Redis Cloud gibi bir servisin verdiği
-// "rediss://..." bağlantı adresini REDIS_URL olarak ayarlaman yeterli.
 const redis = process.env.REDIS_URL
   ? new Redis(process.env.REDIS_URL)
   : new Redis({ host: '127.0.0.1', port: 6379 });
@@ -36,58 +32,61 @@ const redis = process.env.REDIS_URL
 redis.on('connect', () => console.log('🔴 Redis Bağlantısı Başarılı!'));
 redis.on('error', (err) => console.error('❌ Redis Hatası:', err));
 
-// FOOTBALL-DATA.ORG API AYARLARI
-// Key'i .env dosyasından okuyoruz — kodun içine yazılmamalı, özellikle
-// bu repo'yu GitHub'a public olarak koyacaksan.
+// API-SPORTS (API-FOOTBALL) AYARLARI
 const API_KEY = process.env.FOOTBALL_API_KEY;
-const FOOTBALL_API_URL = 'https://api.football-data.org/v4/matches';
+const FOOTBALL_API_URL = 'https://v3.football.api-sports.io/fixtures';
 
 if (!API_KEY) {
   console.error('❌ FOOTBALL_API_KEY tanımlı değil. .env dosyana ekle: FOOTBALL_API_KEY=xxxxx');
 }
 
-// Bugünü değil, geçmiş birkaç günü ve önümüzdeki birkaç günü kapsayan bir
-// aralık istiyoruz — API tarih parametresi verilmezse sadece "bugün"ü
-// döndürüyor, bu yüzden geçmiş/bitmiş maçlar hiç görünmüyordu.
+// API-Sports tarih formatı için YYYY-MM-DD
 function toDateParam(date) {
   return date.toISOString().split('T')[0];
 }
 
-function getDateRange() {
-  const today = new Date();
-
-  const dateFrom = new Date(today);
-  dateFrom.setDate(today.getDate() - 3);
-
-  const dateTo = new Date(today);
-  dateTo.setDate(today.getDate() + 2);
-
-  return { dateFrom: toDateParam(dateFrom), dateTo: toDateParam(dateTo) };
+// Bugünün maçlarını veya canlı maçları çekmek için tarih parametresi
+function getTodayParam() {
+  return toDateParam(new Date());
 }
 
-// Gerçek Maç Verilerini Çeken Fonksiyon
+// Gerçek Maç Verilerini Çeken Fonksiyon (API-Sports / Fixtures)
 async function fetchRealMatches() {
   try {
     const response = await axios.get(FOOTBALL_API_URL, {
-      headers: { 'X-Auth-Token': API_KEY },
-      params: getDateRange()
+      headers: { 'x-apisports-key': API_KEY },
+      params: { date: getTodayParam() } // O günün maçları
     });
 
-    const rawMatches = response.data.matches || [];
+    const rawMatches = response.data.response || [];
 
-    // API'den gelen karmaşık veriyi bizim frontend'in anlayacağı sade formata dönüştürüyoruz (Data Mapping)
-    const formattedMatches = rawMatches.slice(0, 30).map((m) => ({
-      id: `match-${m.id}`,
-      homeTeam: m.homeTeam.shortName || m.homeTeam.name,
-      awayTeam: m.awayTeam.shortName || m.awayTeam.name,
-      homeCrest: m.homeTeam.crest || null,
-      awayCrest: m.awayTeam.crest || null,
-      homeScore: m.score.fullTime.home ?? 0,
-      awayScore: m.score.fullTime.away ?? 0,
-      minute: m.status === 'IN_PLAY' ? 'CANLI' : m.status,
-      status: m.status === 'IN_PLAY' ? 'LIVE' : (m.status === 'FINISHED' ? 'FINISHED' : 'UPCOMING'),
-      competition: m.competition.name,
-    }));
+    // API-Sports'tan gelen karmaşık veriyi frontend'in anlayacağı sade formata dönüştürüyoruz
+    const formattedMatches = rawMatches.slice(0, 30).map((item) => {
+      const m = item.fixture;
+      const teams = item.teams;
+      const goals = item.goals;
+      const statusShort = m.status.short; // LIVE, FT, NS vb.
+
+      let mappedStatus = 'UPCOMING';
+      if (['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(statusShort)) {
+        mappedStatus = 'LIVE';
+      } else if (['FT', 'AET', 'PEN'].includes(statusShort)) {
+        mappedStatus = 'FINISHED';
+      }
+
+      return {
+        id: `match-${m.id}`,
+        homeTeam: teams.home.name,
+        awayTeam: teams.away.name,
+        homeCrest: teams.home.logo,
+        awayCrest: teams.away.logo,
+        homeScore: goals.home ?? 0,
+        awayScore: goals.away ?? 0,
+        minute: m.status.elapsed ? `${m.status.elapsed}'` : statusShort,
+        status: mappedStatus,
+        competition: item.league.name,
+      };
+    });
 
     if (formattedMatches.length > 0) {
       // 1. Veriyi Redis'e Önbellekle
@@ -95,18 +94,19 @@ async function fetchRealMatches() {
       
       // 2. Canlı Olarak WebSocket İle Frontend'e Fırlat
       io.emit('matchUpdate', formattedMatches);
-      console.log(`⚽ ${formattedMatches.length} adet gerçek maç verisi güncellendi! [${new Date().toLocaleTimeString()}]`);
+      console.log(`⚽ ${formattedMatches.length} adet API-Sports maç verisi güncellendi! [${new Date().toLocaleTimeString()}]`);
     } else {
-      console.log('⚠️ Şu an aktif oynanan veya yakın zamanda maç bulunamadı.');
+      console.log('⚠️ Bugün için aktif oynanan veya planlanan maç bulunamadı.');
     }
 
   } catch (error) {
-    console.error('❌ Dış API Veri Çekme Hatası:', error.message);
+    console.error('❌ Dış API Veri Çekme Hatası:', error.response?.data || error.message);
   }
 }
 
-// Dış API'yi yormamak ve limiti aşmamak için HER 20 SANİYEDE BİR gerçek veriyi çek
-setInterval(fetchRealMatches, 20000);
+// Dış API limitlerini (Ücretsiz planda günlük 100 istek) aşmamak için 
+// süreyi örneğin 60 saniyeye çıkarmak mantıklı olabilir. 
+setInterval(fetchRealMatches, 60000);
 
 // Sunucu ilk açıldığında hemen bir kere çalıştır
 fetchRealMatches();
@@ -115,7 +115,6 @@ fetchRealMatches();
 io.on('connection', async (socket) => {
   console.log(`⚡ Yeni İstemci Bağlandı: ${socket.id}`);
 
-  // Yeni bağlanan kullanıcıya direkt Redis'teki hazır veriyi sun (API'ye istek atmadan!)
   const cachedMatches = await redis.get('matches:live');
   if (cachedMatches) {
     socket.emit('initialMatches', JSON.parse(cachedMatches));
