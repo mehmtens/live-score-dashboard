@@ -7,9 +7,6 @@ import MatchList from './components/MatchList'
 import { getCompetitionList, groupByCompetition, isLive } from './lib/matchUtils'
 
 // Backend WebSocket sunucumuza bağlanıyoruz.
-// Yerelde çalışırken .env yoksa localhost:5000'e bağlanır; deploy ettiğinde
-// .env dosyasına VITE_SOCKET_URL=https://senin-backend-adresin şeklinde
-// gerçek adresi yazman yeterli.
 const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000')
 
 export default function App() {
@@ -23,13 +20,11 @@ export default function App() {
     const handleConnect = () => setIsConnected(true)
     const handleDisconnect = () => setIsConnected(false)
 
-    // İlk yüklemede Redis'ten gelen veri
     const handleInitial = (data) => {
       setMatches(data)
       setSelectedId((current) => current ?? data[0]?.id ?? null)
     }
 
-    // Her güncellemede gelen canlı veri
     const handleUpdate = (data) => setMatches(data)
 
     socket.on('connect', handleConnect)
@@ -69,11 +64,15 @@ export default function App() {
 
   const liveMatch = selectedMatch && isLive(selectedMatch) ? selectedMatch : null
 
+  // Sadece canlı olan maçların sayısı
+  const liveCount = matches.filter(isLive).length
+
   return (
     <div className="min-h-screen bg-ink font-sans text-text">
       <Header
         isConnected={isConnected}
-        matchCount={matches.length}
+        liveCount={liveCount}
+        totalCount={matches.length}
         search={search}
         onSearchChange={setSearch}
         liveMatch={liveMatch}

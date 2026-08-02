@@ -1,7 +1,7 @@
 import { Radio, Search } from 'lucide-react'
 import { hasLiveClock, minuteProgress } from '../lib/matchUtils'
 
-export default function Header({ isConnected, matchCount, search, onSearchChange, liveMatch }) {
+export default function Header({ isConnected, liveCount = 0, totalCount = 0, search, onSearchChange, liveMatch }) {
   const progress = liveMatch ? minuteProgress(liveMatch) : 0
 
   return (
@@ -30,20 +30,27 @@ export default function Header({ isConnected, matchCount, search, onSearchChange
             />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 rounded-full border border-line bg-panel px-3 py-2 font-mono text-xs">
-            <span className={`h-2 w-2 rounded-full ${isConnected ? 'animate-pulse bg-success' : 'bg-away'}`} />
-            <span className={isConnected ? 'text-success' : 'text-away'}>
-              {isConnected ? `CANLI · ${matchCount}` : 'BAĞLANTI YOK'}
-            </span>
+          <div className="flex shrink-0 items-center gap-2">
+            {isConnected ? (
+              <>
+                <div className="flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-mono text-xs font-bold text-red-500">
+                  <span className="h-2 w-2 rounded-full animate-pulse bg-red-500" />
+                  <span>CANLI · {liveCount}</span>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1.5 font-mono text-xs text-muted">
+                  <span>Toplam: {totalCount}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 rounded-full border border-line bg-panel px-3 py-1.5 font-mono text-xs font-semibold text-away">
+                <span className="h-2 w-2 rounded-full bg-away" />
+                <span>BAĞLANTI YOK</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Signature element: a broadcast-style match clock. If the backend
-          ever sends a real elapsed minute, this fills proportionally; right
-          now (free-tier API, no live minute) it falls back to a plain
-          sweeping indicator so it still reads as "something's live" instead
-          of sitting frozen at 0%. */}
       <div className="h-[3px] w-full overflow-hidden bg-line/40">
         {liveMatch ? (
           hasLiveClock(liveMatch) ? (

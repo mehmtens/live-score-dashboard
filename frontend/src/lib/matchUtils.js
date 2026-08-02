@@ -1,11 +1,3 @@
-// Small, defensive helpers around the match shape coming from the socket
-// backend: { id, competition, homeTeam, awayTeam, homeScore, awayScore,
-// status, minute, stats: { possession: { home, away }, ... } }
-//
-// Every helper here assumes only `possession` is guaranteed and treats any
-// other stat (shots, corners, cards, ...) as optional, so the UI degrades
-// gracefully if the backend hasn't started sending it yet.
-
 export function isLive(match) {
   return match?.status === 'LIVE'
 }
@@ -18,11 +10,6 @@ export function isUpcoming(match) {
   return match?.status === 'UPCOMING'
 }
 
-// The backend collapses everything into 3 top-level statuses (LIVE /
-// FINISHED / UPCOMING), but the `minute` field still carries the *raw*
-// football-data.org status string for anything that isn't live ("FINISHED",
-// "SCHEDULED", "POSTPONED", "PAUSED", ...). This maps those raw values to
-// short Turkish labels instead of leaking English API strings into the UI.
 const RAW_MINUTE_LABELS = {
   CANLI: 'CANLI',
   FINISHED: 'MS',
@@ -41,8 +28,6 @@ export function getMinuteLabel(match) {
   return RAW_MINUTE_LABELS[raw] ?? raw
 }
 
-// Fuller phrasing for the match-detail hero, where there's room for more
-// than a compact badge label.
 const RAW_HEADLINE_LABELS = {
   CANLI: 'CANLI',
   FINISHED: 'Maç Sona Erdi',
@@ -61,12 +46,6 @@ export function getStatusHeadline(match) {
   return RAW_HEADLINE_LABELS[raw] ?? raw
 }
 
-// football-data.org's free tier doesn't expose a live elapsed-minute count
-// ("minute" is just the literal string "CANLI" for in-play matches), so
-// there's no real number to drive a proportional match-clock fill. This
-// only returns true if a genuine numeric minute ever shows up (e.g. after
-// upgrading the API plan), so the header can fall back to a plain
-// "something's live" indicator instead of a bar permanently stuck at 0%.
 export function hasLiveClock(match) {
   if (!isLive(match)) return false
   return /\d/.test(String(match?.minute ?? ''))
@@ -94,9 +73,6 @@ export function groupByCompetition(matches) {
   return order.map((competition) => ({ competition, items: groups.get(competition) }))
 }
 
-// Turns a minute string like "67'" or "45+2'" into a 0-100 progress value
-// for the header's live match-clock bar. Falls back to 0 for anything
-// that isn't parseable (half-time, not-started, penalties, etc.)
 export function minuteProgress(match) {
   const raw = match?.minute
   if (!raw) return 0
@@ -115,9 +91,6 @@ const STAT_DEFINITIONS = [
   { key: 'redCards', label: 'Kırmızı Kart' },
 ]
 
-// Only returns rows for stats that actually exist on this match, so the
-// stats tab never shows an empty "0 - 0" row for data the backend doesn't
-// send yet, and picks up new stat types automatically once it does.
 export function buildStatRows(stats) {
   if (!stats) return []
 
