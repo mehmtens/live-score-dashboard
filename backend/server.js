@@ -71,9 +71,10 @@ async function fetchRealMatches() {
 
   try {
     // Bugünün tüm maçları (canlı + planlanan + bitmiş)
+    const today = getTodayParam();
     const response = await axios.get(BZZOIRO_BASE_URL + '/', {
       headers: { Authorization: `Token ${API_KEY}` },
-      params: { date: getTodayParam(), limit: 100 },
+      params: { date_from: today, date_to: today, limit: 100 },
       timeout: 10000
     });
 
@@ -86,8 +87,8 @@ async function fetchRealMatches() {
         id: `match-${event.id}`,
         homeTeam: event.home_team,
         awayTeam: event.away_team,
-        homeCrest: event.home_team_logo || null,
-        awayCrest: event.away_team_logo || null,
+        homeCrest: event.home_team_id ? `https://sports.bzzoiro.com/img/team/${event.home_team_id}/` : null,
+        awayCrest: event.away_team_id ? `https://sports.bzzoiro.com/img/team/${event.away_team_id}/` : null,
         homeScore: event.home_score ?? 0,
         awayScore: event.away_score ?? 0,
         minute: formatMinute(mappedStatus, event),
