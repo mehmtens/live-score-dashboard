@@ -32,72 +32,67 @@ const redis = process.env.REDIS_URL
 redis.on('connect', () => console.log('🔴 Redis Bağlantısı Başarılı!'));
 redis.on('error', (err) => console.error('❌ Redis Hatası:', err.message));
 
-// API-FOOTBALL (api-football.com / API-Sports) AYARLARI
-const API_KEY = process.env.FOOTBALL_API_KEY;
-const FOOTBALL_API_URL = 'https://v3.football.api-sports.io/fixtures';
+// BZZOIRO SPORTS DATA AYARLARI
+const API_KEY = process.env.BZZOIRO_API_KEY;
+const BZZOIRO_BASE_URL = 'https://sports.bzzoiro.com/api/v2/events';
 
 if (!API_KEY) {
-  console.error('❌ FOOTBALL_API_KEY tanımlı değil. .env dosyana ekle: FOOTBALL_API_KEY=xxxxx');
+  console.error('❌ BZZOIRO_API_KEY tanımlı değil. .env dosyana ekle: BZZOIRO_API_KEY=xxxxx');
 }
 
-// API-Football tarih formatı için YYYY-MM-DD
-function toDateParam(date) {
-  return date.toISOString().split('T')[0];
-}
-
-// Bugünün maçlarını veya canlı maçları çekmek için tarih parametresi
+// YYYY-MM-DD formatında bugünün tarihi
 function getTodayParam() {
-  return toDateParam(new Date());
+  return new Date().toISOString().split('T')[0];
 }
 
-// Gerçek Maç Verilerini Çeken Fonksiyon (API-Football / Fixtures)
+// Bzzoiro status değerlerini bizim frontend formatımıza çevirir
+function mapStatus(status) {
+  if (status === 'inprogress' || status === 'penalties') return 'LIVE';
+  if (status === 'finished') return 'FINISHED';
+  return 'UPCOMING'; // notstarted
+}
+
+// Dakika/durum metnini oluşturur (bitmiş maçlarda "current_minute" yanıltıcı olabileceği için ayrı ele alınıyor)
+function formatMinute(mappedStatus, event) {
+  if (mappedStatus === 'LIVE') {
+    if (event.period === 'halftime') return 'İY';
+    return event.current_minute ? `${event.current_minute}'` : 'CANLI';
+  }
+  if (mappedStatus === 'FINISHED') return 'MS';
+  return 'Başlamadı';
+}
+
+// Gerçek Maç Verilerini Çeken Fonksiyon (Bzzoiro Sports Data)
 async function fetchRealMatches() {
   if (!API_KEY) {
-    console.error('❌ FOOTBALL_API_KEY eksik olduğu için maç verisi çekilemiyor.');
+    console.error('❌ BZZOIRO_API_KEY eksik olduğu için maç verisi çekilemiyor.');
     return;
   }
 
   try {
-    const response = await axios.get(FOOTBALL_API_URL, {
-      headers: { 'x-apisports-key': API_KEY },
-      params: { date: getTodayParam() }, // O günün maçları
+    // Bugünün tüm maçları (canlı + planlanan + bitmiş)
+    const response = await axios.get(BZZOIRO_BASE_URL + '/', {
+      headers: { Authorization: `Token ${API_KEY}` },
+      params: { date: getTodayParam(), limit: 100 },
       timeout: 10000
     });
 
-    // API-Football hata döndürürse (örn. limit aşımı, geçersiz key) burada yakalanır
-    const apiErrors = response.data.errors;
-    if (apiErrors && Object.keys(apiErrors).length > 0) {
-      console.error('❌ API-Football Hatası:', apiErrors);
-      return;
-    }
+    const rawMatches = response.data.results || response.data.events || [];
 
-    const rawMatches = response.data.response || [];
-
-    // API-Football'dan gelen karmaşık veriyi frontend'in anlayacağı sade formata dönüştürüyoruz
-    const formattedMatches = rawMatches.slice(0, 30).map((item) => {
-      const m = item.fixture;
-      const teams = item.teams;
-      const goals = item.goals;
-      const statusShort = m.status.short; // LIVE, FT, NS vb.
-
-      let mappedStatus = 'UPCOMING';
-      if (['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(statusShort)) {
-        mappedStatus = 'LIVE';
-      } else if (['FT', 'AET', 'PEN'].includes(statusShort)) {
-        mappedStatus = 'FINISHED';
-      }
+    const formattedMatches = rawMatches.slice(0, 50).map((event) => {
+      const mappedStatus = mapStatus(event.status);
 
       return {
-        id: `match-${m.id}`,
-        homeTeam: teams.home.name,
-        awayTeam: teams.away.name,
-        homeCrest: teams.home.logo,
-        awayCrest: teams.away.logo,
-        homeScore: goals.home ?? 0,
-        awayScore: goals.away ?? 0,
-        minute: m.status.elapsed ? `${m.status.elapsed}'` : statusShort,
+        id: `match-${event.id}`,
+        homeTeam: event.home_team,
+        awayTeam: event.away_team,
+        homeCrest: event.home_team_logo || null,
+        awayCrest: event.away_team_logo || null,
+        homeScore: event.home_score ?? 0,
+        awayScore: event.away_score ?? 0,
+        minute: formatMinute(mappedStatus, event),
         status: mappedStatus,
-        competition: item.league.name,
+        competition: event.league_name,
       };
     });
 
@@ -107,7 +102,7 @@ async function fetchRealMatches() {
 
       // 2. Canlı Olarak WebSocket İle Frontend'e Fırlat
       io.emit('matchUpdate', formattedMatches);
-      console.log(`⚽ ${formattedMatches.length} adet API-Football maç verisi güncellendi! [${new Date().toLocaleTimeString()}]`);
+      console.log(`⚽ ${formattedMatches.length} adet Bzzoiro maç verisi güncellendi! [${new Date().toLocaleTimeString()}]`);
     } else {
       console.log('⚠️ Bugün için aktif oynanan veya planlanan maç bulunamadı.');
     }
@@ -117,9 +112,9 @@ async function fetchRealMatches() {
   }
 }
 
-// Dış API limitlerini (Ücretsiz planda günlük 100 istek) aşmamak için
-// süreyi örneğin 60 saniyeye çıkarmak mantıklı olabilir.
-setInterval(fetchRealMatches, 60000);
+// Bzzoiro "rate limit yok" diyor ama yine de nazik davranıp 30 saniyede bir çekiyoruz
+// (canlı skorlar için makul bir aralık, sunucuyu boğmuyoruz)
+setInterval(fetchRealMatches, 30000);
 
 // Sunucu ilk açıldığında hemen bir kere çalıştır
 fetchRealMatches();
